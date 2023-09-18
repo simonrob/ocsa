@@ -15,10 +15,10 @@
   <ProviderName>Simon Robinson</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Signature"/>
-  <Description DefaultValue="Insert a signature in Outlook Calendar invitation messages."/>
+  <Description DefaultValue="Easily insert a signature in Outlook Calendar invitation messages"/>
   <IconUrl DefaultValue="https://simonrob.github.io/ocsa/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="https://simonrob.github.io/ocsa/assets/icon-64.png"/>
-  <SupportUrl DefaultValue="https://simonrob.github.io/ocsa/"/>
+  <SupportUrl DefaultValue="https://github.com/simonrob/ocsa/"/>
 
   <!-- Domains that will be allowed when navigating. For example, if you use ShowTaskpane and then have an href link, navigation will only be allowed if the domain is on this list. -->
   <AppDomains>
