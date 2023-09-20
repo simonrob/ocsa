@@ -3,14 +3,9 @@ const signatureSetting = 'calendarSignature';
 let existingBody = '';
 let requestHeader = undefined;
 
-Office.onReady((info) => {
-	// note: used in both the signature button and the standalone taskpane, so we need to check objects exist
+Office.onReady(function(info) {
+	// note: used in both the add signature button and the standalone taskpane, so we need to check objects exist
 	if (info.host === Office.HostType.Outlook) {
-		const saveButton = document.getElementById('saveSignature');
-		if (saveButton) {
-			saveButton.onclick = saveSignature;
-		}
-
 		if (window.jQuery) {
 			$(document).ready(function() {
 				const textColours = [
@@ -41,7 +36,7 @@ Office.onReady((info) => {
 							allowCustomBackColor: true,
 						}
 					},
-					// autogrow: true
+					autogrow: false
 				});
 
 				if (Office.context.roamingSettings.get(signatureSetting)) {
@@ -49,25 +44,26 @@ Office.onReady((info) => {
 								Base64.decode(Office.context.roamingSettings.get(signatureSetting)));
 				}
 
-				const minheight = 100;  // to avoid button overlap at small sizes
-				trumbowygElement.closest('.trumbowyg-box').css({minHeight: minheight});
-				trumbowygElement.prev('.trumbowyg-editor').css({minHeight: minheight});
-				trumbowygElement.css({minHeight: minheight}); // fixes the raw HTML editor
-
-				trumbowygElement.css({display: 'block'});
-				$('#saveSignature').css({display: 'block'});
+				let height = 100; // to avoid button overlap at small sizes
+				trumbowygElement.closest('.trumbowyg-box').css({minHeight: height});
+				height -= $('.trumbowyg-button-pane').height() - 1; // button bar is 36, but can wrap; 1 is the border
+				trumbowygElement.prev('.trumbowyg-editor').css({minHeight: height});
+				trumbowygElement.css({minHeight: height}); // fixes the raw HTML editor
 
 				$(window).on('resize', resizeEditor);
 				resizeEditor();
 			});
-		} else {
-			const signatureBox = document.getElementById('signatureText');
-			if (signatureBox) {
-				signatureBox.style.display = 'block';
-			}
-			if (saveButton) {
-				saveButton.style.display = 'block';
-			}
+		}
+
+		// elements are hidden by default (in case Office is not present)
+		const signatureBox = document.getElementById('signatureText');
+		if (signatureBox) {
+			signatureBox.style.display = 'block';
+		}
+		const saveButton = document.getElementById('saveSignature');
+		if (saveButton) {
+			saveButton.style.display = 'block';
+			saveButton.onclick = saveSignature;
 		}
 	}
 });
@@ -86,14 +82,22 @@ function showTaskPaneMessage(messageText, autoHide) {
 }
 
 function resizeEditor() {
-	// make full height initially
+	const saveButton = $('#saveSignature');
 	const trumbowygElement = $('#signatureText');
-	const boxPos = trumbowygElement.closest('.trumbowyg-box').position().top;
-	const buttonPos = $('#saveSignature').position().top;
-	let newHeight = buttonPos - boxPos - 12;
-	trumbowygElement.closest('.trumbowyg-box').css({height: newHeight});
-	trumbowygElement.prev('.trumbowyg-editor').css({height: newHeight});
-	trumbowygElement.css({height:newHeight});
+	const closestBox = trumbowygElement.closest('.trumbowyg-box');
+
+	// the first launch popup is shown in a different style, so needs a slight visual edit
+	if (window.location.search.indexOf('?firstlaunch') !== -1) {
+		$('body').css({padding: 0});
+		saveButton.css({margin: 0, marginRight: 6});
+	}
+
+	// make the editor fill the available height
+	let newHeight = saveButton.position().top - closestBox.position().top - 12; // 12 is padding between button and box
+	closestBox.css({height: newHeight});
+	newHeight = newHeight - $('.trumbowyg-button-pane').height() - 1; // button bar is 36, but can wrap; 1 is the border
+	trumbowygElement.prev('.trumbowyg-editor').css({height: newHeight}); // the main editor box
+	trumbowygElement.css({height: newHeight}); // the textarea (used for HTML editing)
 }
 
 function cleanIDAndClassValues(bodyContent) {
@@ -102,18 +106,27 @@ function cleanIDAndClassValues(bodyContent) {
 }
 
 function saveSignature(firstTime) {
-	var signature;
+	let hasSavedSignature = Office.context.roamingSettings.get(signatureSetting);
+
+	// we need to remove any id="[id]" (+ class="") because Outlook replaces it with id="x_[id]", which breaks detection
+	let signature;
 	if (window.jQuery) {
 		signature = cleanIDAndClassValues($('#signatureText').trumbowyg('html'));
 	} else {
 		signature = cleanIDAndClassValues(document.getElementById('signatureText').value);
 	}
+
 	showTaskPaneMessage('✎    Saving…', false);
 	Office.context.roamingSettings.set(signatureSetting, Base64.encode(signature));
 	Office.context.roamingSettings.saveAsync(function(asyncResult) {
 		if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-			// Office.addin.hide();  // not supported on the web
 			showTaskPaneMessage('✓    Saved', true);
+			if (!hasSavedSignature) {
+				if (typeof Office.context.ui.messageParent == 'function') {
+					Office.context.ui.messageParent(true.toString()); // first time - close dialog and re-add signature
+				}
+			}
+			// Office.addin.hide(); // not supported on the web
 		} else {
 			showTaskPaneMessage('✗    Save failed', false);
 			console.error('saveSignature', asyncResult.status, ':', asyncResult.error.message);
@@ -134,14 +147,35 @@ function addSignature(firstTime) {
 	}
 
 	if (!Office.context.roamingSettings.get(signatureSetting)) {
-		console.log('saveSignature: no signature saved');  // TODO: show an alert somehow
-		// TODO: is there a beter way? Office.addin.showAsTaskpane() isn't supported in Outlook
-		Office.context.ui.displayDialogAsync('https://www.robinson.ac/r/outlook-calendar-signature/taskpane.html');
-		requestHeader.completed();
-		requestHeader = undefined;
+		console.log('addSignature: no saved signature found; opening save dialog');
+		
+		// we need a separate dialog box on first load because Office.addin.showAsTaskpane() isn't supported in Outlook
+		Office.context.ui.displayDialogAsync(
+			'https://simonrob.github.io/ocsa/taskpane.html?firstlaunch',
+			{width: 60, height: 70, displayInIframe: true},
+			function (asyncResult) {
+				if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+					const dialog = asyncResult.value;
+					dialog.addEventHandler(Office.EventType.DialogMessageReceived, function (message) {
+						dialog.close(); // the only message we ever send is "signature saved"; no need to check content
+
+						// it would be better to call addSignature (with requestHeader) to add the signature straight
+						// away, but there is no way (without a page refresh) to reload the roamingSettings object; if 
+						// we instead call addSignature from the save callback, Office.context.mailbox is undefined...
+						if (typeof requestHeader === 'object') {
+							requestHeader.completed();
+							requestHeader = undefined;
+						}
+					});
+				} else {
+					console.log('displayDialogAsync', asyncResult.status, ':', asyncResult.error.message);
+				}
+			}
+		);
+		return;
 	}
 
-	// append to any existing body content
+	// append the signature to any existing body content
 	// note: we need to do this because while there is a setSignatureAsync method, it doesn't work with calendar events 
 	// ("The operation is not supported"): https://learn.microsoft.com/en-us/javascript/api/outlook/office.body?view=
 	// outlook-js-preview#outlook-office-body-setsignatureasync-member(1)
