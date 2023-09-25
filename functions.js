@@ -105,7 +105,7 @@ function cleanIDAndClassValues(bodyContent) {
 	return bodyContent.replaceAll(/(id|class)="x_(.*?)"/gi, '$1="$2"');
 }
 
-function saveSignature(firstTime) {
+function saveSignature() {
 	let hasSavedSignature = Office.context.roamingSettings.get(signatureSetting);
 
 	// we need to remove any id="[id]" (+ class="") because Outlook replaces it with id="x_[id]", which breaks detection
@@ -183,14 +183,21 @@ function addSignature(firstTime) {
 		Office.CoercionType.Html,
 		function (asyncResult) {
 			if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+				appendSignature(false, asyncResult.value + 
+					Base64.decode(Office.context.roamingSettings.get(signatureSetting)));
+				
+				/*
+				// note: removed this more complex approach as it needs more testing in desktop apps 
 				if (firstTime) {
 					// first step: get the existing body to later check whether it has a signature already
 					existingBody = asyncResult.value;
-					appendSignature(true, Base64.decode(Office.context.roamingSettings.get(signatureSetting)));
+					appendSignature(false, Base64.decode(Office.context.roamingSettings.get(signatureSetting)));
 				} else {
 					// third step: asyncResult.value is now the signature as re-formatted by Outlook
-					appendSignature(false, asyncResult.value);
+					appendSignature(false, cleanIDAndClassValues(existingBody.replace(asyncResult.value, '')) + 
+						asyncResult.value);
 				}
+				*/
 			} else {
 				console.log('addSignature', asyncResult.status, ':', asyncResult.error.message);
 			}
@@ -199,11 +206,6 @@ function addSignature(firstTime) {
 }
 
 function appendSignature(firstTime, bodyContent) {
-	if (!firstTime) {
-		// fourth step: remove any existing (un-edited) signature content; append the signature
-		bodyContent = cleanIDAndClassValues(existingBody.replace(bodyContent, '')) + bodyContent;
-	}
-
 	Office.context.mailbox.item.body.setAsync(
 		bodyContent,
 		{ coercionType: Office.CoercionType.Html },
