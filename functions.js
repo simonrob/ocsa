@@ -20,12 +20,9 @@ Office.onReady(function(info) {
 
 				const trumbowygElement = $('#signatureText');
 				trumbowygElement.trumbowyg({
-					btns: [
-						['fontfamily', 'fontsize'],
-						['bold', 'italic', 'underline'],
-						['foreColor', 'backColor'],
-						['link'],
-						['viewHTML']
+					btns: [ // note: carefully arranged to avoid overly limiting the colour pane's width
+						['fontfamily', 'fontsize'],['bold', 'italic', 'underline', 'del'], ['link'],
+						['foreColor', 'backColor', 'unorderedList', 'orderedList', 'horizontalRule'], ['viewHTML']
 					],
 					semantic: false,
 					plugins: {
