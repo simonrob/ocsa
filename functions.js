@@ -21,7 +21,7 @@ Office.onReady(function(info) {
 				const trumbowygElement = $('#signatureText');
 				trumbowygElement.trumbowyg({
 					btns: [ // note: carefully arranged to avoid overly limiting the colour pane's width
-						['fontfamily', 'fontsize'],['bold', 'italic', 'underline', 'del'], ['link'],
+						['fontfamily', 'fontsize'], ['bold', 'italic', 'underline', 'del'], ['link'],
 						['foreColor', 'backColor', 'unorderedList', 'orderedList', 'horizontalRule'], ['viewHTML']
 					],
 					semantic: false,
@@ -172,7 +172,8 @@ function addSignature(firstTime) {
 		return;
 	}
 
-	// append the signature to any existing body content
+	// append the signature to any existing body content - note that calendar invitations are always HTML:
+	// https://learn.microsoft.com/en-us/office/dev/add-ins/outlook/insert-data-in-the-body
 	// note: we need to do this because while there is a setSignatureAsync method, it doesn't work with calendar events 
 	// ("The operation is not supported"): https://learn.microsoft.com/en-us/javascript/api/outlook/office.body?view=
 	// outlook-js-preview#outlook-office-body-setsignatureasync-member(1)
@@ -180,9 +181,15 @@ function addSignature(firstTime) {
 		Office.CoercionType.Html,
 		function (asyncResult) {
 			if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-				appendSignature(false, asyncResult.value + 
-					Base64.decode(Office.context.roamingSettings.get(signatureSetting)));
-				
+				if (asyncResult.value.indexOf('</body>') !== -1) {
+					// most versions of Outlook handle appending to HTML with no problem; the old macOS interface needs help
+					appendSignature(false, asyncResult.value.replace('</body>', 
+						Base64.decode(Office.context.roamingSettings.get(signatureSetting)) + '</body>'));
+				} else {
+					appendSignature(false, asyncResult.value + 
+						Base64.decode(Office.context.roamingSettings.get(signatureSetting)));
+				}
+
 				/*
 				// note: removed this more complex approach as it needs more testing in desktop apps 
 				if (firstTime) {
