@@ -47,23 +47,29 @@ Office.onReady(function(info) {
 				trumbowygElement.prev('.trumbowyg-editor').css({minHeight: height});
 				trumbowygElement.css({minHeight: height}); // fixes the raw HTML editor
 
+				showInterface();
+
 				$(window).on('resize', resizeEditor);
 				resizeEditor();
 			});
-		}
-
-		// elements are hidden by default (in case Office is not present)
-		const signatureBox = document.getElementById('signatureText');
-		if (signatureBox) {
-			signatureBox.style.display = 'block';
-		}
-		const saveButton = document.getElementById('saveSignature');
-		if (saveButton) {
-			saveButton.style.display = 'block';
-			saveButton.onclick = saveSignature;
+		} else {
+			showInterface();
 		}
 	}
 });
+
+function showInterface() {
+	// elements are hidden by default (in case Office is not present)
+	const signatureBox = document.getElementById('signatureText');
+	if (signatureBox) {
+		signatureBox.style.display = 'block';
+	}
+	const saveButton = document.getElementById('saveSignature');
+	if (saveButton) {
+		saveButton.style.display = 'block';
+		saveButton.onclick = saveSignature;
+	}
+}
 
 function showTaskPaneMessage(messageText, autoHide) {
 	if (window.jQuery) {
